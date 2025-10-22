@@ -33,7 +33,7 @@ export const useMarkdown = (initialMarkdown = '') => {
   // サンプルテキストを読み込み
   const loadSample = useCallback(async () => {
     try {
-      const response = await fetch('/data/sample.md');
+      const response = await fetch('./data/sample.md');
       const sampleText = await response.text();
       setMarkdown(sampleText);
     } catch (error) {
