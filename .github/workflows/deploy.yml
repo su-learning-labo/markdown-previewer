@@ -1,0 +1,108 @@
+# ワークフローの名前
+name: Deploy Markdown Previewer to Xserver
+
+# ワークフローが実行されるタイミング
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # 手動実行も可能にする
+
+# 実行されるジョブを定義
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # リポジトリのコードをチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Node.js環境のセットアップ
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      # 依存関係のインストール
+      - name: Install dependencies
+        run: npm ci
+
+      # プロジェクトのビルド
+      - name: Build project
+        run: npm run build
+
+      # ビルド成果物の確認
+      - name: List build artifacts
+        run: |
+          echo "Build artifacts:"
+          ls -la dist/
+          echo "Total size:"
+          du -sh dist/
+
+      # Xserverへのデプロイ
+      - name: Deploy to Xserver
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e # エラーが発生したら、すぐにスクリプトを停止する
+            
+            # デプロイ先ディレクトリに移動
+            cd /home/${{ secrets.SSH_USERNAME }}/i-iide.com/public_html/apps/markdown-previewer
+            
+            # Gitリポジトリを更新
+            echo "🔄 Updating repository..."
+            git pull origin main
+            
+            # 依存関係をインストール
+            echo "📦 Installing dependencies..."
+            npm ci
+            
+            # プロジェクトをビルド
+            echo "🔨 Building project..."
+            npm run build
+            
+            # ビルド成果物をWebサーバーの公開ディレクトリにコピー
+            echo "📁 Copying build artifacts..."
+            cp -r dist/* ./
+            
+            # 権限を設定
+            echo "🔐 Setting permissions..."
+            chmod -R 755 ./
+            
+            # デプロイ完了メッセージ
+            echo "✅ Markdown Previewer deployment successful!"
+            echo "🌐 Application is now live at: https://i-iide.com/apps/markdown-previewer/"
+            
+            # デプロイ情報を表示
+            echo "📊 Deployment info:"
+            echo "  - Branch: main"
+            echo "  - Commit: $(git rev-parse --short HEAD)"
+            echo "  - Timestamp: $(date)"
+            echo "  - Build size: $(du -sh dist/ | cut -f1)"
+
+      # デプロイ後のヘルスチェック
+      - name: Health Check
+        run: |
+          echo "🔍 Performing health check..."
+          sleep 10 # デプロイ完了を待つ
+          
+          # アプリケーションが正常に動作しているかチェック
+          if curl -f -s "https://i-iide.com/apps/markdown-previewer/" > /dev/null; then
+            echo "✅ Health check passed! Application is accessible."
+          else
+            echo "❌ Health check failed! Application may not be accessible."
+            exit 1
+          fi
+
+      # デプロイ成功通知
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "🎉 Deployment completed successfully!"
+          echo "📱 Markdown Previewer is now live at: https://i-iide.com/apps/markdown-previewer/"
