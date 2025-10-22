@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       # 依存関係のインストール
@@ -58,6 +58,17 @@ jobs:
             # Gitリポジトリを更新
             echo "🔄 Updating repository..."
             git pull origin main
+            
+            # Node.jsバージョンの確認と更新
+            echo "🔍 Checking Node.js version..."
+            node --version
+            
+            # Node.js 20のインストール（必要に応じて）
+            if ! node --version | grep -q "v20"; then
+              echo "📦 Installing Node.js 20..."
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
             
             # 依存関係をインストール
             echo "📦 Installing dependencies..."
