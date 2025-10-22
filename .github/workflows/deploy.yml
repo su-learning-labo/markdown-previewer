@@ -41,8 +41,20 @@ jobs:
           echo "Total size:"
           du -sh dist/
 
-      # Xserverへのデプロイ
+      # Xserverへのデプロイ（ビルド済みファイルをアップロード）
       - name: Deploy to Xserver
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "dist/*"
+          target: "/home/${{ secrets.SSH_USERNAME }}/i-iide.com/public_html/apps/markdown-previewer/"
+          strip_components: 1
+
+      # デプロイ後の処理
+      - name: Post-deployment setup
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -55,33 +67,6 @@ jobs:
             # デプロイ先ディレクトリに移動
             cd /home/${{ secrets.SSH_USERNAME }}/i-iide.com/public_html/apps/markdown-previewer
             
-            # Gitリポジトリを更新
-            echo "🔄 Updating repository..."
-            git pull origin main
-            
-            # Node.jsバージョンの確認と更新
-            echo "🔍 Checking Node.js version..."
-            node --version
-            
-            # Node.js 20のインストール（必要に応じて）
-            if ! node --version | grep -q "v20"; then
-              echo "📦 Installing Node.js 20..."
-              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-              sudo apt-get install -y nodejs
-            fi
-            
-            # 依存関係をインストール
-            echo "📦 Installing dependencies..."
-            npm ci
-            
-            # プロジェクトをビルド
-            echo "🔨 Building project..."
-            npm run build
-            
-            # ビルド成果物をWebサーバーの公開ディレクトリにコピー
-            echo "📁 Copying build artifacts..."
-            cp -r dist/* ./
-            
             # 権限を設定
             echo "🔐 Setting permissions..."
             chmod -R 755 ./
@@ -93,9 +78,13 @@ jobs:
             # デプロイ情報を表示
             echo "📊 Deployment info:"
             echo "  - Branch: main"
-            echo "  - Commit: $(git rev-parse --short HEAD)"
+            echo "  - Commit: ${{ github.sha }}"
             echo "  - Timestamp: $(date)"
-            echo "  - Build size: $(du -sh dist/ | cut -f1)"
+            echo "  - Deployed from GitHub Actions"
+            
+            # ファイル一覧を表示
+            echo "📁 Deployed files:"
+            ls -la
 
       # デプロイ後のヘルスチェック
       - name: Health Check
